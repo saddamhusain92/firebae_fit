@@ -31,6 +31,7 @@ const PomodoroTimer = () => {
   const [seconds, setSeconds] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const [isBreak, setIsBreak] = useState(false);
+  const [isStarted, setIsStarted] = useState(false);
 
   const requestNotificationPermission = useCallback(() => {
     if (Notification.permission === 'default') {
@@ -73,9 +74,11 @@ const PomodoroTimer = () => {
           if (isBreak) {
             showNotification('Break is over! Time to get back to work.');
             resetTimer(false);
+            setIsStarted(false); 
           } else {
             showNotification('Workout session finished! Time for a break.');
             resetTimer(true);
+            setIsActive(true); // Automatically start the break
           }
         }
       }, 1000);
@@ -87,13 +90,31 @@ const PomodoroTimer = () => {
 
 
   const toggle = () => {
+    if (!isStarted) {
+      setIsStarted(true);
+    }
     setIsActive(!isActive);
   };
+  
+  const handleStart = () => {
+    setIsStarted(true);
+    setIsActive(true);
+  };
+
+  const handleReset = () => {
+    resetTimer(isBreak)
+    if(isBreak){
+       setIsActive(true)
+    } else {
+       setIsStarted(false)
+    }
+  }
+
 
   return (
     <Card className="mb-6">
       <CardHeader>
-        <CardTitle className="font-headline">Pomodoro Timer</CardTitle>
+        <CardTitle className="font-headline">Workout Timer</CardTitle>
         <CardDescription>{isBreak ? 'Time for a break!' : 'Focus on your workout.'}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col items-center justify-center">
@@ -101,12 +122,20 @@ const PomodoroTimer = () => {
           {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
         </div>
         <div className="flex gap-2">
-          <Button onClick={toggle} size="icon">
-            {isActive ? <Pause /> : <Play />}
-          </Button>
-          <Button onClick={() => resetTimer(isBreak)} size="icon" variant="outline">
-            <RotateCcw />
-          </Button>
+            {!isStarted ? (
+                 <Button onClick={handleStart} size="lg">
+                    <Play className="mr-2" /> Start Workout
+                </Button>
+            ) : (
+                <>
+                    <Button onClick={toggle} size="icon">
+                        {isActive ? <Pause /> : <Play />}
+                    </Button>
+                    <Button onClick={handleReset} size="icon" variant="outline">
+                        <RotateCcw />
+                    </Button>
+                </>
+            )}
         </div>
       </CardContent>
     </Card>
