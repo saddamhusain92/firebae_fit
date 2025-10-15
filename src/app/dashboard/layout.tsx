@@ -1,7 +1,7 @@
 'use client';
 import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { DashboardNav } from '@/components/dashboard-nav';
 import { UserNav } from '@/components/user-nav';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -16,6 +16,7 @@ export default function DashboardLayout({
 }) {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -41,6 +42,11 @@ export default function DashboardLayout({
     );
   }
 
+  const handleLinkClick = () => {
+    setIsSheetOpen(false);
+  };
+
+
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
       <div className="hidden border-r bg-muted/40 md:block">
@@ -58,7 +64,7 @@ export default function DashboardLayout({
       </div>
       <div className="flex flex-col">
         <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
-           <Sheet>
+           <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
             <SheetTrigger asChild>
               <Button
                 variant="outline"
@@ -76,7 +82,7 @@ export default function DashboardLayout({
                   <span className="">FitFlow</span>
                 </a>
               </div>
-              <DashboardNav />
+              <DashboardNav onLinkClick={handleLinkClick} />
             </SheetContent>
           </Sheet>
           <div className="w-full flex-1">

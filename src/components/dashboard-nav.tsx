@@ -22,7 +22,7 @@ const navItems = [
   { href: '/dashboard/profile', label: 'Profile', icon: UserCircle },
 ];
 
-export function DashboardNav() {
+export function DashboardNav({ onLinkClick }: { onLinkClick?: () => void }) {
   const pathname = usePathname();
 
   return (
@@ -31,6 +31,7 @@ export function DashboardNav() {
         <Link
           key={href}
           href={href}
+          onClick={onLinkClick}
           className={cn(
             buttonVariants({ variant: 'ghost' }),
             'justify-start gap-2',
