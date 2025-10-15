@@ -10,23 +10,9 @@ import {
   Tooltip
 } from 'recharts';
 import { motion } from 'framer-motion';
-
-const weeklyData = [
-  { day: 'Mon', calories: 350 },
-  { day: 'Tue', calories: 0 },
-  { day: 'Wed', calories: 500 },
-  { day: 'Thu', calories: 0 },
-  { day: 'Fri', calories: 600 },
-  { day: 'Sat', calories: 200 },
-  { day: 'Sun', calories: 0 },
-];
-
-const monthlyData = [
-    { week: 'Week 1', workouts: 3 },
-    { week: 'Week 2', workouts: 4 },
-    { week: 'Week 3', workouts: 2 },
-    { week: 'Week 4', workouts: 3 },
-];
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import { startOfWeek, endOfWeek, eachDayOfInterval, format, isWithinInterval, getWeek, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 
 const itemVariants = {
   hidden: { y: 20, opacity: 0 },
@@ -42,6 +28,71 @@ const itemVariants = {
 
 
 export default function AnalyticsPage() {
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const workoutsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return collection(firestore, 'users', user.uid, 'workouts');
+  }, [firestore, user]);
+
+  const { data: workouts, isLoading } = useCollection(workoutsQuery);
+
+  const getWeeklyData = () => {
+    if (!workouts) return [];
+    const today = new Date();
+    const start = startOfWeek(today, { weekStartsOn: 1 });
+    const end = endOfWeek(today, { weekStartsOn: 1 });
+    const weekDays = eachDayOfInterval({ start, end });
+
+    const weeklyData = weekDays.map(day => ({
+      day: format(day, 'E'),
+      calories: 0,
+    }));
+
+    workouts.forEach(workout => {
+      const workoutDate = parseISO(workout.date);
+      if (isWithinInterval(workoutDate, { start, end })) {
+        const dayOfWeek = format(workoutDate, 'E');
+        const dayIndex = weeklyData.findIndex(d => d.day === dayOfWeek);
+        if (dayIndex !== -1) {
+          weeklyData[dayIndex].calories += workout.caloriesBurned;
+        }
+      }
+    });
+
+    return weeklyData;
+  }
+
+  const getMonthlyData = () => {
+    if (!workouts) return [];
+    const today = new Date();
+    const start = startOfMonth(today);
+    const end = endOfMonth(today);
+
+    const weeklyWorkouts: { [week: number]: number } = {};
+
+    workouts.forEach(workout => {
+      const workoutDate = parseISO(workout.date);
+      if (isWithinInterval(workoutDate, { start, end })) {
+        const weekNumber = getWeek(workoutDate);
+        if (!weeklyWorkouts[weekNumber]) {
+          weeklyWorkouts[weekNumber] = 0;
+        }
+        weeklyWorkouts[weekNumber]++;
+      }
+    });
+
+    return Object.entries(weeklyWorkouts).map(([week, count]) => ({
+      week: `Week ${Object.keys(weeklyWorkouts).indexOf(week) + 1}`,
+      workouts: count,
+    }));
+  };
+
+  const weeklyData = getWeeklyData();
+  const monthlyData = getMonthlyData();
+
+
   return (
     <>
       <div>
