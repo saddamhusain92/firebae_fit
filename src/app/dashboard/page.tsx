@@ -1,19 +1,49 @@
 'use client';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dumbbell, Target, Flame } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { collection } from 'firebase/firestore';
+import { startOfWeek, isWithinInterval, parseISO } from 'date-fns';
 
 export default function DashboardPage() {
   const { user } = useUser();
-  
-  // These would be fetched from Firestore in a real app
-  const stats = {
-    totalWorkouts: 28,
-    caloriesBurned: 8400,
-    goalsCompleted: 3,
-    workoutsThisWeek: 3,
-  };
+  const firestore = useFirestore();
+
+  const workoutsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return collection(firestore, 'users', user.uid, 'workouts');
+  }, [firestore, user]);
+
+  const goalsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return collection(firestore, 'users', user.uid, 'goals');
+  }, [firestore, user]);
+
+  const { data: workouts, isLoading: isLoadingWorkouts } = useCollection(workoutsQuery);
+  const { data: goals, isLoading: isLoadingGoals } = useCollection(goalsQuery);
+
+  const stats = useMemoFirebase(() => {
+    const today = new Date();
+    const startOfThisWeek = startOfWeek(today, { weekStartsOn: 1 });
+    
+    const workoutsThisWeek = workouts?.filter(workout => {
+        const workoutDate = parseISO(workout.date);
+        return isWithinInterval(workoutDate, { start: startOfThisWeek, end: today });
+    }).length || 0;
+
+    const totalWorkouts = workouts?.length || 0;
+    const caloriesBurned = workouts?.reduce((acc, workout) => acc + (workout.caloriesBurned || 0), 0) || 0;
+    const goalsCompleted = goals?.filter(goal => goal.currentValue >= goal.targetValue).length || 0;
+
+    return {
+      totalWorkouts,
+      caloriesBurned,
+      goalsCompleted,
+      workoutsThisWeek,
+    };
+  }, [workouts, goals]);
+
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -44,7 +74,7 @@ export default function DashboardPage() {
           Welcome back, {user?.displayName?.split(' ')[0] || 'User'}!
         </h1>
         <p className="text-muted-foreground">
-          You’ve completed {stats.workoutsThisWeek} workouts this week — keep up the great work 💪.
+          You’ve completed {stats.workoutsThisWeek} workout{stats.workoutsThisWeek === 1 ? '' : 's'} this week — keep up the great work 💪.
         </p>
       </motion.div>
 
@@ -61,7 +91,7 @@ export default function DashboardPage() {
               <Dumbbell className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalWorkouts}</div>
+              <div className="text-2xl font-bold">{isLoadingWorkouts ? '...' : stats.totalWorkouts}</div>
               <p className="text-xs text-muted-foreground">All-time recorded workouts</p>
             </CardContent>
           </Card>
@@ -73,7 +103,7 @@ export default function DashboardPage() {
               <Flame className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.caloriesBurned.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{isLoadingWorkouts ? '...' : stats.caloriesBurned.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">Estimated total calories</p>
             </CardContent>
           </Card>
@@ -85,7 +115,7 @@ export default function DashboardPage() {
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">+{stats.goalsCompleted}</div>
+              <div className="text-2xl font-bold">+{isLoadingGoals ? '...' : stats.goalsCompleted}</div>
               <p className="text-xs text-muted-foreground">Achieved fitness goals</p>
             </CardContent>
           </Card>
@@ -97,7 +127,19 @@ export default function DashboardPage() {
             <CardTitle>Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">Your recent workouts will be displayed here.</p>
+            {isLoadingWorkouts ? (
+                <p>Loading recent activity...</p>
+            ) : workouts && workouts.length > 0 ? (
+                <ul className="space-y-2">
+                    {workouts.slice(0, 5).map(workout => (
+                        <li key={workout.id} className="text-sm text-muted-foreground">
+                            You logged a workout for <span className="font-semibold text-foreground">{workout.exerciseName}</span> on {new Date(workout.date).toLocaleDateString()}.
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="text-muted-foreground">Your recent workouts will be displayed here.</p>
+            )}
           </CardContent>
         </Card>
       </div>
