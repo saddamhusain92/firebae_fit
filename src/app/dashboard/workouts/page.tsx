@@ -5,6 +5,7 @@ import { PlusCircle, Dumbbell, Edit, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUser, useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
+import { AddWorkoutDialog } from '@/components/add-workout-dialog';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -48,9 +49,7 @@ export default function WorkoutsPage() {
           <h1 className="text-3xl font-bold font-headline tracking-tight">My Workouts</h1>
           <p className="text-muted-foreground">Log, view, and manage your training sessions.</p>
         </div>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Workout
-        </Button>
+        <AddWorkoutDialog />
       </div>
 
       {isLoading && <p>Loading workouts...</p>}
@@ -108,9 +107,9 @@ export default function WorkoutsPage() {
             <div className="flex flex-col items-center gap-1 text-center">
               <h3 className="text-2xl font-bold tracking-tight">No workouts logged</h3>
               <p className="text-sm text-muted-foreground">Start by adding your first workout session.</p>
-              <Button className="mt-4">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Workout
-              </Button>
+              <div className="mt-4">
+                  <AddWorkoutDialog />
+              </div>
             </div>
           </div>
         )
