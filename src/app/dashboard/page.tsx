@@ -1,11 +1,11 @@
 'use client';
-import { useAuth } from '@/hooks/use-auth';
+import { useUser } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dumbbell, Target, Flame } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user } = useUser();
   
   // These would be fetched from Firestore in a real app
   const stats = {

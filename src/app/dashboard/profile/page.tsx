@@ -1,5 +1,5 @@
 'use client';
-import { useAuth } from '@/hooks/use-auth';
+import { useUser } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { motion } from 'framer-motion';
 import { Camera } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user } = useUser();
   const defaultAvatar = PlaceHolderImages.find(img => img.id === 'default-avatar')?.imageUrl || '';
 
   const getInitials = (name: string | null | undefined) => {
