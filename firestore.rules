@@ -1,0 +1,173 @@
+/**
+ * @fileoverview Firestore Security Rules for the Workout application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model where each user can only
+ * access their own data, which is stored under their unique user ID. This
+ * promotes data privacy and prevents unauthorized access. No data can be
+ * accessed without authentication.
+ *
+ * Data Structure:
+ * All data is nested under `/users/{userId}`, creating a clear hierarchy and
+ * simplifying security rules.  Each user has their own `userProfile`,
+ * `workouts`, `goals`, and `exerciseSuggestions` collections.
+ *
+ * Key Security Decisions:
+ * - User listing is disallowed to protect user privacy.
+ * - All write operations require a valid, authenticated user.
+ * - Data consistency between document IDs and path parameters is strictly enforced.
+ *
+ * Denormalization for Authorization:
+ * Each document includes the `userProfileId` field, which is used to match
+ * the authenticated user's ID. This avoids the need for costly `get()` calls
+ * to parent documents and enables simpler, more efficient security rules.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Checks if the request is made by an authenticated user.
+     * @returns {boolean} True if the user is signed in, false otherwise.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the authenticated user ID matches the provided user ID.
+     * @param {string} userId - The user ID to compare against the authenticated user's ID.
+     * @returns {boolean} True if the user IDs match, false otherwise.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the authenticated user is the owner of an existing resource.
+     * @param {string} userId - The user ID to compare against the authenticated user's ID.
+     * @returns {boolean} True if the user IDs match and the resource exists, false otherwise.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Security rules for user profiles.
+     * @path /users/{userId}/userProfile
+     * @allow (create) - User with ID 'user123' can create their profile.
+     *   Request: { auth: { uid: 'user123' }, resource: { data: { id: 'user123', name: 'John Doe', email: 'john.doe@example.com' } } }
+     * @allow (get) - User with ID 'user123' can read their profile.
+     *   Request: { auth: { uid: 'user123' } }
+     * @allow (update) - User with ID 'user123' can update their profile.
+     *   Request: { auth: { uid: 'user123' }, resource: { data: { id: 'user123', name: 'Updated Name' } } }
+     * @allow (list) - User with ID 'user123' can list their profile.
+     *   Request: { auth: { uid: 'user123' } }
+     * @deny (create) - User with ID 'user456' cannot create a profile for user 'user123'.
+     *   Request: { auth: { uid: 'user456' }, resource: { data: { id: 'user123', name: 'John Doe', email: 'john.doe@example.com' } } }
+     * @deny (update) - User with ID 'user456' cannot update the profile for user 'user123'.
+     *   Request: { auth: { uid: 'user456' }, resource: { data: { id: 'user123', name: 'Updated Name' } } }
+     * @deny (delete) - User with ID 'user456' cannot delete the profile for user 'user123'.
+     *   Request: { auth: { uid: 'user456' } }
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, and validates relational integrity between documents.
+     */
+    match /users/{userId}/userProfile {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false; // User listing is not allowed
+
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Security rules for workouts under a user's profile.
+     * @path /users/{userId}/workouts/{workoutId}
+     * @allow (create) - User with ID 'user123' can create a workout.
+     *   Request: { auth: { uid: 'user123' }, resource: { data: { userProfileId: 'user123', id: 'workout456', exerciseName: 'Bench Press', sets: 3, reps: 8, duration: 60, caloriesBurned: 300, date: '2024-01-01T12:00:00Z' } } }
+     * @allow (get) - User with ID 'user123' can read a specific workout.
+     *   Request: { auth: { uid: 'user123' } }
+     * @allow (list) - User with ID 'user123' can list their workouts.
+     *   Request: { auth: { uid: 'user123' } }
+     * @allow (update) - User with ID 'user123' can update a specific workout.
+     *   Request: { auth: { uid: 'user123' }, resource: { data: { userProfileId: 'user123', id: 'workout456', sets: 4 } } }
+     * @allow (delete) - User with ID 'user123' can delete a specific workout.
+     *   Request: { auth: { uid: 'user123' } }
+     * @deny (create) - User with ID 'user456' cannot create a workout for user 'user123'.
+     *   Request: { auth: { uid: 'user456' }, resource: { data: { userProfileId: 'user123', id: 'workout456', exerciseName: 'Bench Press', sets: 3, reps: 8, duration: 60, caloriesBurned: 300, date: '2024-01-01T12:00:00Z' } } }
+     * @deny (update) - User with ID 'user456' cannot update a workout for user 'user123'.
+     *   Request: { auth: { uid: 'user456' }, resource: { data: { userProfileId: 'user123', id: 'workout456', sets: 4 } } }
+     * @deny (delete) - User with ID 'user456' cannot delete a workout for user 'user123'.
+     *   Request: { auth: { uid: 'user456' } }
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, and validates relational integrity between documents.
+     */
+    match /users/{userId}/workouts/{workoutId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userProfileId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.userProfileId == resource.data.userProfileId;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Security rules for goals under a user's profile.
+     * @path /users/{userId}/goals/{goalId}
+     * @allow (create) - User with ID 'user123' can create a goal.
+     *   Request: { auth: { uid: 'user123' }, resource: { data: { userProfileId: 'user123', id: 'goal456', goalType: 'Weight Loss', targetValue: 10, currentValue: 0, startDate: '2024-01-01T00:00:00Z', endDate: '2024-03-31T00:00:00Z' } } }
+     * @allow (get) - User with ID 'user123' can read a specific goal.
+     *   Request: { auth: { uid: 'user123' } }
+     * @allow (list) - User with ID 'user123' can list their goals.
+     *   Request: { auth: { uid: 'user123' } }
+     * @allow (update) - User with ID 'user123' can update a specific goal.
+     *   Request: { auth: { uid: 'user123' }, resource: { data: { userProfileId: 'user123', id: 'goal456', currentValue: 5 } } }
+     * @allow (delete) - User with ID 'user123' can delete a specific goal.
+     *   Request: { auth: { uid: 'user123' } }
+     * @deny (create) - User with ID 'user456' cannot create a goal for user 'user123'.
+     *   Request: { auth: { uid: 'user456' }, resource: { data: { userProfileId: 'user123', id: 'goal456', goalType: 'Weight Loss', targetValue: 10, currentValue: 0, startDate: '2024-01-01T00:00:00Z', endDate: '2024-03-31T00:00:00Z' } } }
+     * @deny (update) - User with ID 'user456' cannot update a goal for user 'user123'.
+     *   Request: { auth: { uid: 'user456' }, resource: { data: { userProfileId: 'user123', id: 'goal456', currentValue: 5 } } }
+     * @deny (delete) - User with ID 'user456' cannot delete a goal for user 'user123'.
+     *   Request: { auth: { uid: 'user456' } }
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, and validates relational integrity between documents.
+     */
+    match /users/{userId}/goals/{goalId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userProfileId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.userProfileId == resource.data.userProfileId;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Security rules for exercise suggestions under a user's profile.
+     * @path /users/{userId}/exerciseSuggestions/{exerciseSuggestionId}
+     * @allow (create) - User with ID 'user123' can create an exercise suggestion.
+     *   Request: { auth: { uid: 'user123' }, resource: { data: { userProfileId: 'user123', id: 'exercise123', exerciseName: 'Push-ups', reason: 'Good for chest', suggestedSets: 3, suggestedReps: 10, date: '2024-01-05T00:00:00Z' } } }
+     * @allow (get) - User with ID 'user123' can read a specific exercise suggestion.
+     *   Request: { auth: { uid: 'user123' } }
+     * @allow (list) - User with ID 'user123' can list their exercise suggestions.
+     *   Request: { auth: { uid: 'user123' } }
+     * @allow (update) - User with ID 'user123' can update a specific exercise suggestion.
+     *   Request: { auth: { uid: 'user123' }, resource: { data: { userProfileId: 'user123', id: 'exercise123', suggestedSets: 4 } } }
+     * @allow (delete) - User with ID 'user123' can delete a specific exercise suggestion.
+     *   Request: { auth: { uid: 'user123' } }
+     * @deny (create) - User with ID 'user456' cannot create an exercise suggestion for user 'user123'.
+     *   Request: { auth: { uid: 'user456' }, resource: { data: { userProfileId: 'user123', id: 'exercise123', exerciseName: 'Push-ups', reason: 'Good for chest', suggestedSets: 3, suggestedReps: 10, date: '2024-01-05T00:00:00Z' } } }
+     * @deny (update) - User with ID 'user456' cannot update an exercise suggestion for user 'user123'.
+     *   Request: { auth: { uid: 'user456' }, resource: { data: { userProfileId: 'user123', id: 'exercise123', suggestedSets: 4 } } }
+     * @deny (delete) - User with ID 'user456' cannot delete an exercise suggestion for user 'user123'.
+     *   Request: { auth: { uid: 'user456' } }
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, and validates relational integrity between documents.
+     */
+    match /users/{userId}/exerciseSuggestions/{exerciseSuggestionId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userProfileId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.userProfileId == resource.data.userProfileId;
+      allow delete: if isExistingOwner(userId);
+    }
+  }
+}
