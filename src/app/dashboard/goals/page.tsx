@@ -4,14 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { PlusCircle, Target } from 'lucide-react';
 import { motion } from 'framer-motion';
-
-// Mock data, this would come from Firestore
-const goals = [
-  { id: '1', name: 'Lose 10 lbs', target: 10, current: 4, unit: 'lbs' },
-  { id: '2', name: 'Run a 5k', target: 5, current: 2.5, unit: 'km' },
-  { id: '3', name: 'Workout 4 times a week', target: 4, current: 3, unit: 'sessions' },
-  { id: '4', name: 'Hit new Bench Press PR', target: 225, current: 205, unit: 'lbs' },
-];
+import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import { AddGoalDialog } from '@/components/add-goal-dialog';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -32,7 +27,20 @@ const itemVariants = {
 };
 
 export default function GoalsPage() {
-  const getProgress = (current: number, target: number) => (current / target) * 100;
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const goalsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return collection(firestore, 'users', user.uid, 'goals');
+  }, [firestore, user]);
+
+  const { data: goals, isLoading } = useCollection(goalsQuery);
+
+  const getProgress = (current: number, target: number) => {
+    if (target === 0) return 0;
+    return (current / target) * 100;
+  };
 
   return (
     <>
@@ -41,12 +49,12 @@ export default function GoalsPage() {
           <h1 className="text-3xl font-bold font-headline tracking-tight">Fitness Goals</h1>
           <p className="text-muted-foreground">Set targets and track your progress towards them.</p>
         </div>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Set New Goal
-        </Button>
+        <AddGoalDialog />
       </div>
 
-      {goals.length > 0 ? (
+      {isLoading && <p>Loading goals...</p>}
+
+      {!isLoading && goals && goals.length > 0 ? (
         <motion.div
           className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
           variants={containerVariants}
@@ -59,33 +67,35 @@ export default function GoalsPage() {
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle className="font-headline">{goal.name}</CardTitle>
-                      <CardDescription>Target: {goal.target} {goal.unit}</CardDescription>
+                      <CardTitle className="font-headline">{goal.goalType}</CardTitle>
+                      <CardDescription>Target: {goal.targetValue}</CardDescription>
                     </div>
                     <Target className="h-8 w-8 text-primary" />
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-medium">{goal.current} / {goal.target} {goal.unit}</p>
-                    <p className="text-sm font-bold text-primary">{getProgress(goal.current, goal.target).toFixed(0)}%</p>
+                    <p className="text-sm font-medium">{goal.currentValue} / {goal.targetValue}</p>
+                    <p className="text-sm font-bold text-primary">{getProgress(goal.currentValue, goal.targetValue).toFixed(0)}%</p>
                   </div>
-                  <Progress value={getProgress(goal.current, goal.target)} />
+                  <Progress value={getProgress(goal.currentValue, goal.targetValue)} />
                 </CardContent>
               </Card>
             </motion.div>
           ))}
         </motion.div>
       ) : (
-        <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm">
-          <div className="flex flex-col items-center gap-1 text-center">
-            <h3 className="text-2xl font-bold tracking-tight">No goals set</h3>
-            <p className="text-sm text-muted-foreground">Set your first fitness goal to get started.</p>
-            <Button className="mt-4">
-              <PlusCircle className="mr-2 h-4 w-4" /> Set New Goal
-            </Button>
-          </div>
-        </div>
+        !isLoading && (
+            <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm min-h-[400px]">
+                <div className="flex flex-col items-center gap-1 text-center">
+                    <h3 className="text-2xl font-bold tracking-tight">No goals set</h3>
+                    <p className="text-sm text-muted-foreground">Set your first fitness goal to get started.</p>
+                    <div className="mt-4">
+                        <AddGoalDialog />
+                    </div>
+                </div>
+            </div>
+        )
       )}
     </>
   );
