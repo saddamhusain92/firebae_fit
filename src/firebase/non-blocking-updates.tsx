@@ -68,6 +68,8 @@ export function updateDocumentNonBlocking(docRef: DocumentReference, data: any) 
         })
       )
     });
+  // Return a resolved promise to avoid breaking await chains if the caller uses them
+  return Promise.resolve();
 }
 
 

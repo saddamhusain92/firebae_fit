@@ -8,6 +8,7 @@ import { collection, doc } from 'firebase/firestore';
 import { AddWorkoutDialog } from '@/components/add-workout-dialog';
 import React, { useState } from 'react';
 import { PomodoroTimer } from '@/components/pomodoro-timer';
+import { EditWorkoutDialog } from '@/components/edit-workout-dialog';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -111,7 +112,7 @@ export default function WorkoutsPage() {
                     <Play className="mr-2 h-4 w-4" />
                     Start
                   </Button>
-                  <Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button>
+                  <EditWorkoutDialog workout={workout} />
                   <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDelete(workout.id)}><Trash2 className="h-4 w-4" /></Button>
                 </CardFooter>
               </Card>
