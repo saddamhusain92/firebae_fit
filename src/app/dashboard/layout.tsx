@@ -23,7 +23,17 @@ export default function DashboardLayout({
     }
   }, [user, isUserLoading, router]);
 
-  if (isUserLoading || !user) {
+  if (isUserLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Logo className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    // This can happen briefly before the redirect, so we can return null or a loading indicator.
+    // Or, since the effect will redirect, we can just show the loader again.
     return (
       <div className="flex h-screen items-center justify-center">
         <Logo className="h-10 w-10 animate-spin text-primary" />
